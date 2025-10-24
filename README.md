@@ -1,2 +1,2 @@
-# ml_weather_forecasting
-Machine Learning Methods to Fine-Tune Local Weather Forecasts
+# ML Weather Forecasting using Python
+Machine Learning methods to fine-tune & bias correct local weather forecasts.
