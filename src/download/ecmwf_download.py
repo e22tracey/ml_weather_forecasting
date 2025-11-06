@@ -1,6 +1,7 @@
 import datetime as dt
 import glob
 import os
+import traceback
 
 import cfgrib
 import requests
@@ -17,24 +18,31 @@ def request_url_process_data(url, grib_file_path, nc_file_path, date_str, run, s
         print(f"Couldn't download {date_str} {run}z {step}h - Status code: {response.status_code}")
         return False
 
-    ds_list = cfgrib.open_datasets(grib_file_path)
-    ds_list_final = []
-    vars = ['t2m', 'd2m', 'msl', 'u10', 'v10', 'tcc']
-    for ds_n in ds_list:
-        var_names = [var for var in vars if var in ds_n.data_vars]
-        if len(var_names) > 0:
-            if 'heightAboveGround' in ds_n.coords:
-                ds_n = ds_n.drop_vars('heightAboveGround')
-            ds_list_final.append(ds_n[var_names])
+    try:
+        ds_list = cfgrib.open_datasets(grib_file_path)
+        ds_list_final = []
+        vars = ['t2m', 'd2m', 'msl', 'u10', 'v10', 'tcc']
+        for ds_n in ds_list:
+            var_names = [var for var in vars if var in ds_n.data_vars]
+            if len(var_names) > 0:
+                if 'heightAboveGround' in ds_n.coords:
+                    ds_n = ds_n.drop_vars('heightAboveGround')
+                ds_list_final.append(ds_n[var_names])
 
-    ds = xr.merge(ds_list_final, compat="no_conflicts")
-    ds = ds.sel(latitude=slice(52, 51.25), longitude=slice(-1.5, -0.75))
-    ds.to_netcdf(nc_file_path)
-    print(f"Saved {nc_file_path}")
+        ds = xr.merge(ds_list_final, compat="no_conflicts")
+        ds = ds.sel(latitude=slice(52, 51.25), longitude=slice(-1.5, -0.75))
+        ds.to_netcdf(nc_file_path)
+        print(f"Saved {nc_file_path}")
 
-    ds.close()
-    for f in glob.glob(f"{grib_file_path}*"):
-        os.remove(f)
+        ds.close()
+        for f in glob.glob(f"{grib_file_path}*"):
+            os.remove(f)
+    except Exception:
+        print(f"Couldn't download {date_str} {run}z {step}h")
+        print("Stack trace was:")
+        traceback.print_exc()
+        return False
+
 
 def url_picker(url_base: str, model: str, date: dt.datetime, run: str, step: int) -> str|None:
     date_str = date.strftime("%Y%m%d")
@@ -65,10 +73,10 @@ if __name__=="__main__":
     dask_client = DaskClient(n_workers=3, threads_per_worker=2)
 
     url_base = "https://ecmwf-forecasts.s3.eu-central-1.amazonaws.com"
-    model = "ifs"
+    model = "aifs"
 
     # Create a list of dates to be downloaded
-    start_dt = dt.datetime(2024, 10, 24)
+    start_dt = dt.datetime(2025, 2, 28)
     end_dt = dt.datetime(2025, 10, 24)
 
     if end_dt > dt.datetime.now():
@@ -96,9 +104,9 @@ if __name__=="__main__":
     # - 6 hourly steps to 360 (15 days)
 
     if model == "ifs":
-        steps = list(range(0, 121, 3))
+        steps = list(range(0, 73, 3))
     elif model == "aifs":
-        steps = list(range(0, 121, 6))
+        steps = list(range(0, 73, 6))
 
     # Setup loops over dates, runs, steps
     futures = []
